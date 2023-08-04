@@ -1,0 +1,12 @@
+kind: ZarfPackageConfig
+metadata:
+  name: no-cluster-pkg
+  version: 0.0.1
+
+components:
+  - name: echo
+    required: true
+    actions:
+      onDeploy:
+        before:
+          - cmd: echo "Unicorns are the national animal of Scotland"

@@ -1,0 +1,12 @@
+kind: UDSBundle
+metadata:
+  name: local-and-remote
+  description: "example of deploying both local and remote Zarf pkgs"
+  version: 0.0.1
+
+zarf-packages:
+#  - repository: localhost:888/init
+#    ref: "###BNDL_TMPL_INIT_VERSION###"
+#    optional-components:
+#      - git-server
+  - repository: ../zarf/no-cluster

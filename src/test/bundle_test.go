@@ -55,15 +55,21 @@ func TestBundle(t *testing.T) {
 		Reference:  fmt.Sprintf("0.0.1-%s", e2e.Arch),
 	}
 
-	tarballPath := filepath.Join("build", fmt.Sprintf("uds-bundle-example-%s-0.0.1.tar.zst", e2e.Arch))
+	tarballOutputPath := filepath.Join("build", fmt.Sprintf("uds-bundle-example-%s-0.0.1.tar.zst", e2e.Arch))
 
 	create(t, bundleRef.Registry)
 
-	pull(t, bundleRef.String(), tarballPath)
+	pull(t, bundleRef.String(), tarballOutputPath)
 
-	inspect(t, bundleRef.String(), tarballPath)
+	inspect(t, bundleRef.String(), tarballOutputPath)
 
-	deployAndRemove(t, bundleRef.String(), tarballPath)
+	deployAndRemove(t, bundleRef.String(), tarballOutputPath)
+}
+
+func TestLocalBundle(t *testing.T) {
+
+	e2e.CreateZarfPkg(t, "src/test/packages/zarf/no-cluster")
+	//create(t, bundleRef.Registry)
 }
 
 func create(t *testing.T, reg string) {
