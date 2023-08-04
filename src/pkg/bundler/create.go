@@ -97,8 +97,6 @@ func (b *Bundler) Create() error {
 	if err != nil {
 		return err
 	}
-
-	// create + publish the bundle
 	return Bundle(remote, &b.bundle, signatureBytes)
 }
 
@@ -153,7 +151,7 @@ func (b *Bundler) confirmBundleCreation() (confirm bool) {
 	}
 
 	prompt := &survey.Confirm{
-		Message: "Create this UDS Bundle?",
+		Message: "Create this UDS PublishBundle?",
 	}
 
 	pterm.Println()

@@ -9,14 +9,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-
 	"github.com/defenseunicorns/uds-cli/src/types"
 	"github.com/defenseunicorns/zarf/src/config"
 	"github.com/defenseunicorns/zarf/src/pkg/message"
 	"github.com/defenseunicorns/zarf/src/pkg/oci"
 	goyaml "github.com/goccy/go-yaml"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"io"
 	"oras.land/oras-go/v2/content"
 )
 
@@ -28,7 +27,7 @@ func Bundle(r *oci.OrasRemote, bundle *types.UDSBundle, signature []byte) error 
 	ref := r.Repo().Reference
 	message.Debug("Bundling", bundle.Metadata.Name, "to", ref)
 
-	manifest := ocispec.Manifest{}
+	manifest := ocispec.Manifest{} // bundle manifest; this tells clients what to do (ends up as a manifest.json in the OCI artifact)
 
 	for _, pkg := range bundle.ZarfPackages {
 		url := fmt.Sprintf("%s:%s", pkg.Repository, pkg.Ref)
@@ -47,7 +46,7 @@ func Bundle(r *oci.OrasRemote, bundle *types.UDSBundle, signature []byte) error 
 			return err
 		}
 		// push the manifest into the bundle
-		manifestDesc, err := r.PushLayer(manifestBytes, oci.ZarfLayerMediaTypeBlob)
+		manifestDesc, err := r.PushLayer(manifestBytes, oci.ZarfLayerMediaTypeBlob) // is this the zarf.yaml?
 		if err != nil {
 			return err
 		}
@@ -71,14 +70,16 @@ func Bundle(r *oci.OrasRemote, bundle *types.UDSBundle, signature []byte) error 
 			}
 		}
 
-		layersToCopy := append(layersFromComponents, metadataLayers...)
+		layersToCopy := append(layersFromComponents, metadataLayers...) // contains only descriptors
 
 		// stream copy the blobs, otherwise do a blob mount
+		// this is the case when the bundle and the Zarf pkg registry don't match
 		if remote.Repo().Reference.Registry != ref.Registry {
 			message.Debugf("Streaming layers from %s --> %s", pkgRef, ref)
 
 			// filterLayers returns true if the layer is in the list of layers to copy, this allows for
 			// copying only the layers that are required by the required + specified optional components
+			// this is effectively "searching" the registry for only the layers we need
 			filterLayers := func(d ocispec.Descriptor) bool {
 				for _, layer := range layersToCopy {
 					if layer.Digest == d.Digest {
@@ -94,10 +95,12 @@ func Bundle(r *oci.OrasRemote, bundle *types.UDSBundle, signature []byte) error 
 		} else {
 			message.Debugf("Performing a cross repository blob mount on %s from %s --> %s", ref, ref.Repository, ref.Repository)
 			spinner := message.NewProgressSpinner("Mounting layers from %s", pkgRef.Repository)
-			layersToCopy = append(layersToCopy, root.Config)
+			layersToCopy = append(layersToCopy, root.Config) // why do we need root.Config in this case?
 
+			// need to do a blob mount bc "push to create repository" is not widely supported
 			for _, layer := range layersToCopy {
 				spinner.Updatef("Mounting %s", layer.Digest.Encoded())
+				// layer is the descriptor!! Verbiage "fetch" or "pull" refers to the actual layers
 				if err := r.Repo().Mount(context.TODO(), layer, pkgRef.Repository, func() (io.ReadCloser, error) {
 					return remote.Repo().Fetch(context.TODO(), layer)
 				}); err != nil {
@@ -109,12 +112,16 @@ func Bundle(r *oci.OrasRemote, bundle *types.UDSBundle, signature []byte) error 
 		}
 	}
 
+	// at this point: for this pkg, we have pushed the manifest.json and grabbed the descriptors/layers of the specified components
+	//                and we have all of these layers available to this ref, which is the FQDN + reference ex.localhost:555/bundle:0.0.1-amd64
+	//                Note when we say "repository" in this context we are referring to the OCI artifact
+
 	// push the bundle's metadata
 	bundleYamlBytes, err := goyaml.Marshal(bundle)
 	if err != nil {
 		return err
 	}
-	bundleYamlDesc, err := r.PushLayer(bundleYamlBytes, oci.ZarfLayerMediaTypeBlob)
+	bundleYamlDesc, err := r.PushLayer(bundleYamlBytes, oci.ZarfLayerMediaTypeBlob) // this is the uds-bundle.yaml
 	if err != nil {
 		return err
 	}
@@ -150,12 +157,12 @@ func Bundle(r *oci.OrasRemote, bundle *types.UDSBundle, signature []byte) error 
 
 	manifest.SchemaVersion = 2
 
-	manifest.Annotations = manifestAnnotationsFromMetadata(&bundle.Metadata)
+	manifest.Annotations = manifestAnnotationsFromMetadata(&bundle.Metadata) //todo: may or may not need this if we want to add extra annotations; allows viewing extra metadata (like README), can map to things in a UI like GHCR
 	b, err := json.Marshal(manifest)
 	if err != nil {
 		return err
 	}
-	expected := content.NewDescriptorFromBytes(ocispec.MediaTypeImageManifest, b)
+	expected := content.NewDescriptorFromBytes(ocispec.MediaTypeImageManifest, b) // this manifest contains both ImageManifest and Blob media types; create a manifest descriptor from the manifest bytes
 
 	message.Debug("Pushing manifest:", message.JSONValue(expected))
 

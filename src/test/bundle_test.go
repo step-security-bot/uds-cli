@@ -56,8 +56,9 @@ func TestBundle(t *testing.T) {
 	}
 
 	tarballPath := filepath.Join("build", fmt.Sprintf("uds-bundle-example-%s-0.0.1.tar.zst", e2e.Arch))
+	bundlePath := "src/test/packages/01-uds-bundle"
 
-	create(t, bundleRef.Registry)
+	create(t, bundlePath, bundleRef.Registry)
 
 	pull(t, bundleRef.String(), tarballPath)
 
@@ -66,9 +67,8 @@ func TestBundle(t *testing.T) {
 	deployAndRemove(t, bundleRef.String(), tarballPath)
 }
 
-func create(t *testing.T, reg string) {
-	dir := "src/test/packages/01-uds-bundle"
-	cmd := strings.Split(fmt.Sprintf("bundle create %s -o oci://%s --set INIT_VERSION=%s --confirm --insecure", dir, reg, zarfVersion), " ")
+func create(t *testing.T, bundlePath string, reg string) {
+	cmd := strings.Split(fmt.Sprintf("bundle create %s -o oci://%s --set INIT_VERSION=%s --confirm --insecure", bundlePath, reg, zarfVersion), " ")
 	_, _, err := e2e.UDS(cmd...)
 	require.NoError(t, err)
 }
@@ -119,6 +119,7 @@ func shasMatch(t *testing.T, path string, expected string) {
 }
 
 func pull(t *testing.T, ref string, tarballPath string) {
+	// todo: output somewhere other than build?
 	cmd := strings.Split(fmt.Sprintf("bundle pull oci://%s -o build --insecure --oci-concurrency=10", ref), " ")
 	_, _, err := e2e.UDS(cmd...)
 	require.NoError(t, err)
