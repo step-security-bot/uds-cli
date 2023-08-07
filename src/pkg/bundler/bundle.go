@@ -46,7 +46,7 @@ func Bundle(r *oci.OrasRemote, bundle *types.UDSBundle, signature []byte) error 
 			return err
 		}
 		// push the manifest into the bundle
-		manifestDesc, err := r.PushLayer(manifestBytes, oci.ZarfLayerMediaTypeBlob) // is this the zarf.yaml?
+		manifestDesc, err := r.PushLayer(manifestBytes, oci.ZarfLayerMediaTypeBlob)
 		if err != nil {
 			return err
 		}
@@ -92,7 +92,7 @@ func Bundle(r *oci.OrasRemote, bundle *types.UDSBundle, signature []byte) error 
 			if err := oci.CopyPackage(remote, r, filterLayers, config.CommonOptions.OCIConcurrency); err != nil {
 				return err
 			}
-		} else {
+		} else { // bundle and zarf pkg are in the same registry
 			message.Debugf("Performing a cross repository blob mount on %s from %s --> %s", ref, ref.Repository, ref.Repository)
 			spinner := message.NewProgressSpinner("Mounting layers from %s", pkgRef.Repository)
 			layersToCopy = append(layersToCopy, root.Config) // why do we need root.Config in this case?
@@ -112,7 +112,7 @@ func Bundle(r *oci.OrasRemote, bundle *types.UDSBundle, signature []byte) error 
 		}
 	}
 
-	// at this point: for this pkg, we have pushed the manifest.json and grabbed the descriptors/layers of the specified components
+	// at this point: for this pkg, we have pushed the Zarf pkgs' manifest.json and grabbed the descriptors/layers of the specified components
 	//                and we have all of these layers available to this ref, which is the FQDN + reference ex.localhost:555/bundle:0.0.1-amd64
 	//                Note when we say "repository" in this context we are referring to the OCI artifact
 
